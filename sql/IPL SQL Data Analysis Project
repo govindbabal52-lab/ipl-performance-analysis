@@ -1,0 +1,488 @@
+CREATE DATABASE IPL_SQL_ANALYSIS;
+
+--Matches Table
+CREATE TABLE matches (
+match_id INT PRIMARY KEY,
+season INT,
+city VARCHAR(100),
+match_date DATE,
+team1 VARCHAR(100),
+team2 VARCHAR(100),
+toss_winner VARCHAR(100),
+toss_decision VARCHAR(20),
+result VARCHAR(50),
+winner VARCHAR(100),
+player_of_match VARCHAR(100),
+venue VARCHAR(200)
+);
+--Deliveries Table
+CREATE TABLE deliveries (
+match_id INT,
+inning INT,
+over_no INT,
+ball INT,
+batting_team VARCHAR(100),
+bowling_team VARCHAR(100),
+batsman VARCHAR(100),
+non_striker VARCHAR(100),
+bowler VARCHAR(100),
+runs INT,
+extra_runs INT,
+dismissal_kind VARCHAR(100),
+player_dismissed VARCHAR(100)
+);
+
+--import_data.sql
+LOAD DATA INFILE 'matches.csv'
+INTO TABLE matches
+FIELDS TERMINATED BY ','
+IGNORE 1 ROWS;
+LOAD DATA INFILE 'deliveries.csv'
+INTO TABLE deliveries
+FIELDS TERMINATED BY ','
+IGNORE 1 ROWS;
+
+--Total Matches
+
+SELECT COUNT(*) AS Total_Matches
+FROM matches;
+
+
+--Total Seasons
+
+SELECT COUNT(DISTINCT season)
+FROM matches;
+
+
+--Total Teams
+
+SELECT DISTINCT team1
+FROM matches;
+
+
+--Matches Won By Every Team
+
+SELECT
+
+winner,
+COUNT(*) Matches_Won
+FROM matches
+GROUP BY winner
+ORDER BY Matches_Won DESC;
+
+
+--Most Successful Team
+
+SELECT
+
+winner,
+COUNT(*) Wins
+FROM matches
+GROUP BY winner
+ORDER BY Wins DESC
+LIMIT 1;
+
+
+--Player Of Match Awards
+
+SELECT
+player_of_match,
+COUNT(*) Awards
+FROM matches
+GROUP BY player_of_match
+ORDER BY Awards DESC;
+
+
+--Top 10 Player Of Match Winners
+
+SELECT
+player_of_match,
+COUNT(*) Awards
+FROM matches
+GROUP BY player_of_match
+ORDER BY Awards DESC
+LIMIT 10;
+
+--Matches Played In Every City
+
+SELECT
+city,
+COUNT(*) Matches
+FROM matches
+GROUP BY city
+ORDER BY Matches DESC;
+
+--Top Stadiums
+
+SELECT
+
+venue,
+COUNT(*) Matches
+FROM matches
+GROUP BY venue
+ORDER BY Matches DESC;
+
+--Toss Winners
+
+SELECT
+toss_winner,
+COUNT(*) Tosses
+FROM matches
+GROUP BY toss_winner
+ORDER BY Tosses DESC;
+
+--Bat First vs Bowl First
+
+SELECT
+toss_decision,
+COUNT(*)
+FROM matches
+GROUP BY toss_decision;
+
+--Toss Win = Match Win
+
+SELECT
+COUNT(*) AS Toss_And_Match_Win
+FROM matches
+WHERE toss_winner=winner;
+
+--Percentage
+
+SELECT
+ROUND(
+COUNT(*)*100/
+(SELECT COUNT(*) FROM matches)
+,2)
+AS Percentage
+FROM matches
+WHERE toss_winner=winner;
+
+--Highest Team Score
+
+SELECT
+
+match_id,
+batting_team,
+SUM(runs+extra_runs) Total
+FROM deliveries
+GROUP BY
+match_id,
+batting_team
+ORDER BY Total DESC
+LIMIT 10;
+
+--Lowest Team Score
+
+SELECT
+match_id,
+batting_team,
+SUM(runs+extra_runs) Total
+FROM deliveries
+GROUP BY
+match_id,
+batting_team
+ORDER BY Total
+LIMIT 10;
+
+--Top Run Scorers
+
+SELECT
+batsman,
+SUM(runs) Total_Runs
+FROM deliveries
+GROUP BY batsman
+ORDER BY Total_Runs DESC
+LIMIT 10;
+
+--Top Wicket Takers
+SELECT
+bowler,
+COUNT(player_dismissed) Wickets
+FROM deliveries
+WHERE player_dismissed IS NOT NULL
+GROUP BY bowler
+ORDER BY Wickets DESC
+LIMIT 10;
+
+--Most Sixes
+
+SELECT
+batsman,
+COUNT(*) Sixes
+FROM deliveries
+WHERE runs=6
+GROUP BY batsman
+ORDER BY Sixes DESC;
+
+
+--Most Fours
+
+SELECT
+batsman,
+COUNT(*) Fours
+FROM deliveries
+WHERE runs=4
+GROUP BY batsman
+ORDER BY Fours DESC;
+
+
+--Total Runs Scored by Each Team
+SELECT
+    batting_team,
+    SUM(runs + extra_runs) AS Total_Runs
+FROM deliveries
+GROUP BY batting_team
+ORDER BY Total_Runs DESC;
+
+
+--Total Balls Faced by Each Batsman
+SELECT
+    batsman,
+    COUNT(*) AS Balls_Faced
+FROM deliveries
+GROUP BY batsman
+ORDER BY Balls_Faced DESC;
+
+--Batting Average (Basic)
+SELECT
+    batsman,
+    SUM(runs) AS Runs,
+    COUNT(player_dismissed) AS Outs,
+    ROUND(SUM(runs) / COUNT(player_dismissed),2) AS Average
+FROM deliveries
+WHERE player_dismissed IS NOT NULL
+GROUP BY batsman
+HAVING Runs > 500
+ORDER BY Average DESC;
+
+
+--Strike Rate
+SELECT
+    batsman,
+    SUM(runs) AS Runs,
+    COUNT(*) AS Balls,
+    ROUND((SUM(runs)*100)/COUNT(*),2) AS Strike_Rate
+FROM deliveries
+GROUP BY batsman
+HAVING Runs > 500
+ORDER BY Strike_Rate DESC;
+
+--Economy Rate
+SELECT
+    bowler,
+    ROUND((SUM(runs + extra_runs)*6.0)/COUNT(*),2) AS Economy
+FROM deliveries
+GROUP BY bowler
+HAVING COUNT(*) > 300
+ORDER BY Economy;
+
+
+--Bowlers with Most Dot Balls
+SELECT
+    bowler,
+    COUNT(*) AS Dot_Balls
+FROM deliveries
+WHERE runs = 0
+GROUP BY bowler
+ORDER BY Dot_Balls DESC
+LIMIT 10;
+
+
+--Highest Individual Score
+SELECT
+    match_id,
+    batsman,
+    SUM(runs) AS Score
+FROM deliveries
+GROUP BY match_id,batsman
+ORDER BY Score DESC
+LIMIT 10;
+
+
+--Team Winning Percentage
+SELECT
+    winner,
+    COUNT(*) AS Wins,
+    ROUND(
+        COUNT(*)*100/
+        (SELECT COUNT(*) FROM matches),2
+    ) AS Winning_Percentage
+FROM matches
+GROUP BY winner
+ORDER BY Winning_Percentage DESC;
+
+--Matches Won Batting First
+
+SELECT
+COUNT(*) AS Bat_First_Wins
+FROM matches
+WHERE result='runs';
+
+
+--Matches Won Chasing
+SELECT
+COUNT(*) AS Chasing_Wins
+FROM matches
+WHERE result='wickets';
+
+
+
+--JOIN QUERIES
+
+
+
+--Total Runs Every Season
+SELECT
+m.season,
+SUM(d.runs+d.extra_runs) AS Total_Runs
+FROM matches m
+JOIN deliveries d
+ON m.match_id=d.match_id
+GROUP BY m.season
+ORDER BY m.season;
+
+
+
+--Orange Cap Leaderboard
+SELECT
+m.season,
+d.batsman,
+SUM(d.runs) AS Runs
+FROM matches m
+JOIN deliveries d
+ON m.match_id=d.match_id
+GROUP BY m.season,d.batsman
+ORDER BY m.season,Runs DESC;
+
+
+--Purple Cap Leaderboard
+SELECT
+m.season,
+d.bowler,
+COUNT(d.player_dismissed) AS Wickets
+FROM matches m
+JOIN deliveries d
+ON m.match_id=d.match_id
+WHERE d.player_dismissed IS NOT NULL
+GROUP BY m.season,d.bowler
+ORDER BY m.season,Wickets DESC;
+
+
+--Total Sixes by Team
+SELECT
+batting_team,
+COUNT(*) AS Sixes
+FROM deliveries
+WHERE runs=6
+GROUP BY batting_team
+ORDER BY Sixes DESC;
+
+
+--Total Fours by Team
+SELECT
+batting_team,
+COUNT(*) AS Fours
+FROM deliveries
+WHERE runs=4
+GROUP BY batting_team
+ORDER BY Fours DESC;
+
+
+--Best Toss Winning Team
+SELECT
+toss_winner,
+COUNT(*) AS Tosses
+FROM matches
+GROUP BY toss_winner
+ORDER BY Tosses DESC
+LIMIT 5;
+
+
+
+--Most Matches Played by Venue
+SELECT
+venue,
+COUNT(*) AS Matches
+FROM matches
+GROUP BY venue
+ORDER BY Matches DESC;
+
+
+
+--Most Matches in Each Season
+SELECT
+season,
+COUNT(*) AS Matches
+FROM matches
+GROUP BY season
+ORDER BY season;
+
+
+
+--SUBQUERY
+
+--Above Average Run Scorers
+SELECT
+batsman,
+SUM(runs) AS TotalRuns
+FROM deliveries
+GROUP BY batsman
+HAVING SUM(runs)>
+(
+SELECT AVG(TotalRuns)
+FROM
+(
+SELECT
+SUM(runs) AS TotalRuns
+FROM deliveries
+GROUP BY batsman
+) x
+);
+
+--Teams with Above Average Wins
+SELECT
+winner,
+COUNT(*) AS Wins
+FROM matches
+GROUP BY winner
+HAVING COUNT(*) >
+(
+SELECT AVG(win_count)
+FROM
+(
+SELECT COUNT(*) AS win_count
+FROM matches
+GROUP BY winner
+) x
+);
+
+
+-- Business Insights
+-- 1. Top 10 Run Scorers
+-- 2. Top 10 Wicket Takers
+-- 3. Best Strike Rate
+-- 4. Best Economy Rate
+-- 5. Toss Impact Analysis
+-- 6. Highest Team Total
+-- 7. Lowest Team Total
+-- 8. Best Stadium by Matches
+-- 9. Season-wise Total Runs
+-- 10. Orange Cap Analysis
+-- 11. Purple Cap Analysis
+-- 12. Team Winning Percentage
+-- 13. Most Dot Balls
+-- 14. Most Sixes
+-- 15. Most Fours
+
+
+
+-- ## 🙏 Thank You
+
+-- Thank you for exploring this project!
+
+-- I built this project to strengthen my SQL and Data Analytics skills through real-world IPL data analysis.
+
+-- If you found this project helpful, feel free to ⭐ star the repository and share your feedback.
+
+-- Happy Learning! 🚀
+
